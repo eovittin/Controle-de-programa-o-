@@ -83,3 +83,25 @@ export const novoId = () => Date.now().toString(36) + Math.random().toString(36)
 
 /** "1 dia", "3 dias". */
 export const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+/** Texto de formulário limpo: sem espaço sobrando e com tamanho máximo. */
+export const texto = (v, max = 160) => String(v ?? "").trim().replace(/\s+/g, " ").slice(0, max);
+
+/** "617" → "F-617"; o resto como foi digitado, em maiúsculas. */
+export function normalizaFrota(v) {
+  const t = texto(v, 30).toUpperCase();
+  return /^\d+$/.test(t) ? "F-" + t : t;
+}
+
+/** "2026-10-26" → "26/10/2026" para planilha; vazio continua vazio. */
+export const dataPlanilha = iso => iso ? iso.split("-").reverse().join("/") : "";
+
+/** Linhas em CSV para o Excel: ponto e vírgula e a marca de UTF-8 na frente,
+ *  que é o que o Excel em português espera. */
+export function csv(linhas) {
+  const cel = v => {
+    const s = String(v ?? "");
+    return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return "﻿" + linhas.map(l => l.map(cel).join(";")).join("\r\n");
+}

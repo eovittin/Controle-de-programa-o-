@@ -1,9 +1,10 @@
-// As quatro telas: Agenda (o mês), Semana (os dias em colunas), Lista e
-// Dados. Cada uma tem a barra do alto e o corpo; a busca redesenha só o corpo.
+// As telas da programação: Agenda (o mês), Semana (os dias em colunas),
+// Lista, e a de Dados (a das Mobilizações fica em tela-mobilizacoes.js). Cada uma tem a barra do alto e o corpo; a busca redesenha só o corpo.
 
 import { el, hoje, somaDias, difDias, inicioDaSemana, brCurto, brData, porExtenso, nomeMes, somaMes,
   diasNoMes, SEMANA, plural } from "./util.js";
 import * as D from "./dados.js";
+import * as M from "./mobilizacoes.js";
 import { ui, redesenhar } from "./estado.js";
 import { filtrados, barraFiltros, linhaItem, vazio, cartao } from "./comum.js";
 import { abrirFicha, abrirFormulario, confirmar } from "./caixas.js";
@@ -288,6 +289,12 @@ export const dados = {
   barra: () => null,
   corpo() {
     const n = D.todos().length;
+    const nm = M.todas().length;
+    const nf = M.todas().reduce((s, m) => s + m.frotas.length, 0);
+    const tem = n + nm > 0;
+    const oQue = [n ? plural(n, "programação", "programações") : "", nm ? plural(nm, "mobilização", "mobilizações") : ""]
+      .filter(Boolean).join(" e ");
+    const OQue = oQue ? oQue[0].toUpperCase() + oQue.slice(1) : "";
     const arquivo = el("input", { type: "file", accept: ".json,application/json", hidden: true });
     let substituir = false;
     arquivo.addEventListener("change", async () => {
@@ -297,41 +304,49 @@ export const dados = {
       try {
         const r = D.restaurarBackup(await f.text(), substituir);
         redesenhar();
-        avisar(`Backup restaurado: ${plural(r.novos, "nova", "novas")}, ${plural(r.atualizados, "atualizada", "atualizadas")}` +
-          (r.ignorados ? `, ${r.ignorados} ignorada(s) por estarem incompletas` : "") + ".", { tempo: 8000 });
+        const partes = [`programações: ${r.novos} novas, ${r.atualizados} atualizadas`];
+        if (r.mobNovas || r.mobAtualizadas) partes.push(`mobilizações: ${r.mobNovas} novas, ${r.mobAtualizadas} atualizadas`);
+        const ignoradas = r.ignorados + r.mobIgnoradas;
+        avisar(`Backup restaurado — ${partes.join("; ")}` + (ignoradas ? `; ${ignoradas} ignorada(s) por estarem incompletas` : "") + ".",
+          { tempo: 9000 });
       } catch (e) {
         avisar(e instanceof SyntaxError ? "Esse arquivo não é um backup (.json) válido." : e.message, { tempo: 8000 });
       }
     });
     const restaurar = trocar => {
       substituir = trocar;
-      if (trocar && n) {
-        confirmar("Substituir tudo?", `As ${n} programações deste navegador serão trocadas pelas do arquivo.`, "Escolher o arquivo", () => arquivo.click());
+      if (trocar && tem) {
+        confirmar("Substituir tudo?", `${OQue} deste navegador serão trocadas pelas do arquivo.`,
+          "Escolher o arquivo", () => arquivo.click());
       } else arquivo.click();
     };
+    const csvBotao = (rotulo, nome, gerar, ativo) => el("button", { type: "button", disabled: !ativo,
+      onclick: () => baixar(`${nome}-${hoje()}.csv`, gerar(), "text/csv;charset=utf-8") }, icone("baixar"), rotulo);
 
     return el("div", { class: "dados" },
       cartao("Onde ficam os seus dados", el("div", {},
         el("p", {}, "Tudo fica guardado ", el("b", {}, "neste navegador, neste aparelho"),
-          ". Ninguém mais vê, e nada vai para a internet. Se você limpar os dados do navegador, a programação vai junto — por isso baixe um backup de vez em quando."),
+          ". Ninguém mais vê, e nada vai para a internet. Se você limpar os dados do navegador, a programação e as mobilizações vão junto — por isso baixe um backup de vez em quando."),
         el("p", {}, "Para usar em outro aparelho: baixe o backup aqui e restaure lá."),
-        el("p", { class: "dados-num" }, el("b", {}, String(n)), " ", n === 1 ? "programação guardada" : "programações guardadas"))),
+        el("p", { class: "dados-num" }, el("b", {}, String(n)), " ", n === 1 ? "programação" : "programações",
+          " · ", el("b", {}, String(nm)), " ", nm === 1 ? "mobilização" : "mobilizações", nf ? ` (${plural(nf, "frota", "frotas")})` : ""))),
       cartao("Backup", el("div", { class: "botoes" },
-        el("button", { type: "button", class: "primario", disabled: !n, onclick: () => {
+        el("button", { type: "button", class: "primario", disabled: !tem, onclick: () => {
           baixar(`backup-programacao-${hoje()}.json`, D.backup(), "application/json");
           avisar("Backup baixado.");
         } }, icone("baixar"), "Baixar backup"),
         el("button", { type: "button", onclick: () => restaurar(false) }, "Restaurar backup (juntar)"),
         el("button", { type: "button", onclick: () => restaurar(true) }, "Restaurar backup (substituir tudo)"),
-        arquivo), { sub: "arquivo .json" }),
+        arquivo), { sub: "arquivo .json, com programações e mobilizações" }),
       cartao("Planilha", el("div", { class: "botoes" },
-        el("button", { type: "button", disabled: !n, onclick: () => baixar(`programacao-completa-${hoje()}.csv`, D.planilha(
-          [...D.todos()].sort((a, b) => a.data.localeCompare(b.data) || D.ordemDoDia(a, b))), "text/csv;charset=utf-8") },
-          icone("baixar"), "Exportar tudo para o Excel")), { sub: "arquivo .csv" }),
+        csvBotao("Programações para o Excel", "programacao-completa", () => D.planilha(
+          [...D.todos()].sort((a, b) => a.data.localeCompare(b.data) || D.ordemDoDia(a, b))), n),
+        csvBotao("Mobilizações para o Excel", "mobilizacoes-completo", () => M.planilha(M.todas()), nm)), { sub: "arquivo .csv" }),
       cartao("Apagar tudo", el("div", {},
-        el("p", {}, "Apaga todas as programações deste navegador. Não tem volta — baixe o backup antes."),
-        el("button", { type: "button", class: "perigo", disabled: !n, onclick: () => confirmar("Apagar tudo?",
-          `As ${n} programações deste navegador serão apagadas. Não tem como desfazer.`, "Apagar tudo",
+        el("p", {}, "Apaga todas as programações e mobilizações deste navegador. Não tem volta — baixe o backup antes."),
+        el("button", { type: "button", class: "perigo", disabled: !tem, onclick: () => confirmar("Apagar tudo?",
+          `${OQue}: tudo será apagado deste navegador. Não tem como desfazer.`, "Apagar tudo",
           () => { D.apagarTudo(); redesenhar(); avisar("Tudo apagado."); }, { perigo: true }) }, "Apagar tudo"))));
   },
 };
+

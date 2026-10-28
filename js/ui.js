@@ -31,6 +31,8 @@ export function avisar(texto, { acao = null, rotulo = "Desfazer", tempo = 5000 }
   const aviso = el("div", { class: "aviso", role: "status" }, el("span", {}, texto),
     acao ? el("button", { type: "button", class: "link", onclick: () => { acao(); aviso.remove(); } }, rotulo) : null);
   caixa.append(aviso);
+  // no máximo três de cada vez: o mais velho sai
+  while (caixa.children.length > 3) caixa.firstElementChild.remove();
   setTimeout(() => aviso.remove(), tempo);
 }
 

@@ -4,10 +4,11 @@
 // tempo, busca a versão nova para a próxima vez. Mudou a lista de arquivos?
 // Acrescente aqui e suba a VERSAO.
 
-const VERSAO = "v1";
+const VERSAO = "v2";
 const ARQUIVOS = [
   "./", "index.html", "manifest.json", "logo.svg", "css/estilo.css",
-  "js/app.js", "js/caixas.js", "js/comum.js", "js/dados.js", "js/estado.js", "js/telas.js", "js/ui.js", "js/util.js",
+  "js/app.js", "js/armazem.js", "js/caixas.js", "js/comum.js", "js/dados.js", "js/estado.js", "js/mobilizacoes.js",
+  "js/tela-mobilizacoes.js", "js/telas.js", "js/ui.js", "js/util.js",
 ];
 
 self.addEventListener("install", e => {

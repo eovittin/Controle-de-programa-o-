@@ -8,7 +8,7 @@ import { icone, avisar, seloSituacao, segmentos } from "./ui.js";
 
 const caixa = () => document.getElementById("caixa");
 
-function abrir(titulo, corpo, rodape) {
+export function abrir(titulo, corpo, rodape) {
   const d = caixa();
   d.replaceChildren(el("div", { class: "cx" },
     el("header", { class: "cx-cab" }, el("h2", { id: "caixa-titulo" }, titulo),
@@ -22,7 +22,7 @@ function abrir(titulo, corpo, rodape) {
 export const fechar = () => caixa().close();
 
 /** Fecha, redesenha e dá o recado. */
-function pronto(recado) {
+export function pronto(recado) {
   fechar();
   redesenhar();
   if (recado) avisar(recado);
@@ -30,7 +30,7 @@ function pronto(recado) {
 
 // ── campos ───────────────────────────────────────────────────────────────────
 
-function campo(rotulo, controle, { nome = "", dica = "", classe = "" } = {}) {
+export function campo(rotulo, controle, { nome = "", dica = "", classe = "" } = {}) {
   return el("div", { class: "campo " + classe, dataset: { campo: nome } },
     el("label", { class: "rot", for: controle.id || null }, rotulo),
     controle,
@@ -38,16 +38,16 @@ function campo(rotulo, controle, { nome = "", dica = "", classe = "" } = {}) {
     el("small", { class: "erro", role: "alert" }));
 }
 
-function entrada(nome, valor, attrs = {}) {
+export function entrada(nome, valor, attrs = {}) {
   return el("input", { id: "f-" + nome, name: nome, value: valor || "", autocomplete: "off", ...attrs });
 }
 
-function lista(id, valores) {
+export function lista(id, valores) {
   return el("datalist", { id }, valores.map(v => el("option", { value: v })));
 }
 
 /** Põe cada erro debaixo do seu campo e leva o foco ao primeiro. */
-function mostrarErros(form, erros) {
+export function mostrarErros(form, erros) {
   form.querySelectorAll(".campo").forEach(c => {
     const msg = erros[c.dataset.campo] || "";
     c.classList.toggle("com-erro", !!msg);
@@ -188,7 +188,7 @@ export function abrirFormulario(it = null, padrao = {}) {
 
 // ── a ficha ──────────────────────────────────────────────────────────────────
 
-const quandoHist = iso => {
+export const quandoHist = iso => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });

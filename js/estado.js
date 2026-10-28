@@ -14,6 +14,7 @@ export const ui = {
   categoria: "",
   periodo: "mes",             // Lista
   filtro: "todas",            // Lista
+  filtroMob: "abertas",       // Mobilizações
 };
 
 let tudo = () => {}, corpo = () => {};

@@ -1,13 +1,18 @@
-// Os dados da programação: o que é cada item, onde fica guardado e o que muda
-// nele. As telas só leem daqui e só mudam pelas funções daqui — assim toda
-// mudança passa pelo histórico do item.
+// Os dados da programação: o que é cada item e o que muda nele. As telas só
+// leem daqui e só mudam pelas funções daqui — assim toda mudança passa pelo
+// histórico do item. Aqui também ficam o carregar, o backup e o apagar tudo,
+// que valem para as programações e as mobilizações juntas.
 //
-// Tudo fica no navegador (localStorage). Para levar para outro aparelho ou
+// Tudo fica no navegador (armazem.js). Para levar para outro aparelho ou
 // guardar uma cópia: Dados → Baixar backup, e Restaurar backup no outro.
 
-import { hoje, ehData, ehHora, somaDias, difDias, diaDaSemana, brCurto, semAcento, novoId, plural } from "./util.js";
+import { hoje, ehData, ehHora, somaDias, difDias, diaDaSemana, brCurto, semAcento, novoId, plural,
+  texto, normalizaFrota, dataPlanilha, csv } from "./util.js";
+import { banco, ler, gravar as salvar, troca } from "./armazem.js";
+import * as M from "./mobilizacoes.js";
 
-const CHAVE = "programacao-operacao:v1";
+export { quandoMudar } from "./armazem.js";
+export { normalizaFrota };
 
 export const CATEGORIAS = [
   { id: "viagem", nome: "Viagem" },
@@ -49,32 +54,14 @@ export const MOTIVOS_REMARCAR = ["Pedido do cliente", "Frota indisponível", "Se
 
 // ── guardar ──────────────────────────────────────────────────────────────────
 
-let itens = [];
-let aoMudar = () => {};
-export const quandoMudar = fn => { aoMudar = fn; };
+const itens = banco.itens;
 
-function armazem() {
-  try { return typeof localStorage !== "undefined" ? localStorage : null; } catch { return null; }
-}
-
+/** Lê do navegador as programações e as mobilizações. */
 export function carregar() {
-  try {
-    const bruto = armazem()?.getItem(CHAVE);
-    const lido = bruto ? JSON.parse(bruto) : null;
-    itens = Array.isArray(lido?.itens) ? lido.itens.filter(i => i && i.id && ehData(i.data)) : [];
-  } catch {
-    itens = [];
-  }
+  const lido = ler();
+  troca(itens, Array.isArray(lido?.itens) ? lido.itens.filter(i => i && i.id && ehData(i.data)) : []);
+  troca(banco.mobilizacoes, Array.isArray(lido?.mobilizacoes) ? lido.mobilizacoes.filter(M.legivel) : []);
   return itens;
-}
-
-/** Grava e avisa a tela. Devolve false se o navegador recusou (cheio, ou
- *  janela anônima que não guarda). */
-function salvar() {
-  let ok = true;
-  try { armazem()?.setItem(CHAVE, JSON.stringify({ versao: 1, itens })); } catch { ok = false; }
-  aoMudar(ok);
-  return ok;
 }
 
 export const todos = () => itens;
@@ -133,14 +120,6 @@ export function sugestoes(campo) {
 }
 
 // ── conferir o que veio do formulário ───────────────────────────────────────
-
-const texto = (v, max = 160) => String(v ?? "").trim().replace(/\s+/g, " ").slice(0, max);
-
-/** "617" → "F-617"; o resto como foi digitado, em maiúsculas. */
-export function normalizaFrota(v) {
-  const t = texto(v, 30).toUpperCase();
-  return /^\d+$/.test(t) ? "F-" + t : t;
-}
 
 /** Confere e limpa os campos. Devolve { limpo, erros }: `erros` tem o campo
  *  e a frase para mostrar ao lado dele. */
@@ -289,19 +268,33 @@ export function devolver({ it, pos }) {
   salvar();
 }
 
+/** Apaga as programações e as mobilizações. */
 export function apagarTudo() {
-  itens = [];
+  troca(itens, []);
+  troca(banco.mobilizacoes, []);
   salvar();
 }
 
 // ── backup e planilha ────────────────────────────────────────────────────────
 
-export const backup = () => JSON.stringify({ app: "programacao-operacao", versao: 1, exportadoEm: agora(), itens }, null, 2);
+export const backup = () => JSON.stringify({ app: "programacao-operacao", versao: 1, exportadoEm: agora(),
+  itens, mobilizacoes: banco.mobilizacoes }, null, 2);
 
 const STATUS = ["programada", "andamento", "concluida", "cancelada"];
 
-/** Lê um backup. `substituir` troca tudo; senão junta (o mesmo id é
- *  atualizado). Item sem o mínimo (o que fazer e o dia) é ignorado. */
+/** Põe `novos` em `lista`: o mesmo id atualiza, o resto entra no fim. */
+function juntar(lista, novos) {
+  let entraram = 0, atualizados = 0;
+  for (const n of novos) {
+    const pos = lista.findIndex(x => x.id === n.id);
+    if (pos >= 0) { lista[pos] = n; atualizados++; } else { lista.push(n); entraram++; }
+  }
+  return [entraram, atualizados];
+}
+
+/** Lê um backup. `substituir` troca tudo o que vier no arquivo; senão junta
+ *  (o mesmo id é atualizado). Backup antigo, sem mobilizações, não mexe nas
+ *  mobilizações. Item sem o mínimo (o que fazer e o dia) é ignorado. */
 export function restaurarBackup(textoArquivo, substituir = false) {
   const lido = JSON.parse(textoArquivo);
   const lista = Array.isArray(lido) ? lido : lido?.itens;
@@ -329,27 +322,27 @@ export function restaurarBackup(textoArquivo, substituir = false) {
     if (bons.at(-1).status === "concluida" && !bons.at(-1).concluidaEm) bons.at(-1).status = "programada";
   }
   let novos = 0, atualizados = 0;
-  if (substituir) { itens = bons; novos = bons.length; }
-  else for (const it of bons) {
-    const pos = itens.findIndex(i => i.id === it.id);
-    if (pos >= 0) { itens[pos] = it; atualizados++; } else { itens.push(it); novos++; }
+  if (substituir) { troca(itens, bons); novos = bons.length; }
+  else [novos, atualizados] = juntar(itens, bons);
+
+  const mob = { mobNovas: 0, mobAtualizadas: 0, mobIgnoradas: 0 };
+  if (Array.isArray(lido?.mobilizacoes)) {
+    const { boas, ignoradas } = M.sanear(lido.mobilizacoes);
+    mob.mobIgnoradas = ignoradas;
+    if (substituir) { troca(banco.mobilizacoes, boas); mob.mobNovas = boas.length; }
+    else [mob.mobNovas, mob.mobAtualizadas] = juntar(banco.mobilizacoes, boas);
   }
   salvar();
-  return { novos, atualizados, ignorados };
+  return { novos, atualizados, ignorados, ...mob };
 }
 
-/** A lista em CSV para o Excel: ponto e vírgula e a marca de UTF-8 na frente,
- *  que é o que o Excel em português espera. */
+/** A lista em CSV para o Excel. */
 export function planilha(lista, ref = hoje()) {
   const cab = ["Dia", "Até", "Início", "Fim", "Frota", "Categoria", "O que fazer", "Onde", "Responsável",
     "Prioridade", "Situação", "Concluída em", "Motivo do atraso", "Remarcações", "Observações"];
-  const br = iso => iso ? iso.split("-").reverse().join("/") : "";
+  const br = dataPlanilha;
   const linhas = lista.map(it => [br(it.data), br(it.dataFim), it.horaInicio, it.horaFim, it.frota, nomeCategoria(it.categoria),
     it.atividade, it.onde, it.responsavel, nomePrioridade(it.prioridade), SITUACOES[situacao(it, ref)], br(it.concluidaEm),
     [it.motivoAtraso, it.detalheAtraso].filter(Boolean).join(" — "), it.remarcacoes || 0, it.obs]);
-  const cel = v => {
-    const s = String(v ?? "");
-    return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return "﻿" + [cab, ...linhas].map(l => l.map(cel).join(";")).join("\r\n");
+  return csv([cab, ...linhas]);
 }

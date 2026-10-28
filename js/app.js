@@ -5,11 +5,21 @@ import { el, hoje } from "./util.js";
 import * as D from "./dados.js";
 import { ui, aoRedesenhar, redesenhar } from "./estado.js";
 import * as T from "./telas.js";
+import * as M from "./mobilizacoes.js";
+import { mobilizacoes } from "./tela-mobilizacoes.js";
 import { abrirFormulario, fechar } from "./caixas.js";
 import { avisar } from "./ui.js";
 
-const TELAS = { agenda: T.agenda, semana: T.semana, lista: T.lista, dados: T.dados };
+const TELAS = { agenda: T.agenda, semana: T.semana, lista: T.lista, mobilizacoes, dados: T.dados };
 const CHAVE_TEMA = "programacao-operacao:tema";
+
+/** O "+ Nova" do topo cria o que é da tela: na Mobilizações, uma
+ *  mobilização; no resto, uma programação. */
+const NOVA_PROGRAMACAO = {
+  rotulo: "Nova",
+  acao: () => abrirFormulario(null, { data: ui.vista === "agenda" ? ui.dia : hoje() }),
+};
+let nova = NOVA_PROGRAMACAO;
 
 const rota = () => {
   const v = location.hash.replace(/^#\/?/, "");
@@ -26,6 +36,8 @@ function desenhar() {
     a.classList.toggle("ativo", ativo);
     if (ativo) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
+  nova = tela.nova || NOVA_PROGRAMACAO;
+  document.getElementById("nova").replaceChildren(el("span", { "aria-hidden": "true" }, "+"), " " + nova.rotulo);
   const barra = tela.barra();
   document.getElementById("tela").replaceChildren(
     barra || "",
@@ -37,14 +49,16 @@ function desenharCorpo() {
   document.getElementById("conteudo").replaceChildren(TELAS[ui.vista].corpo());
 }
 
-/** O número de atrasadas ao lado de Agenda, no menu e na barra de baixo. */
+/** Os números de atrasadas no menu e na barra de baixo: as programações ao
+ *  lado de Agenda, as frotas que não chegaram ao lado de Mobilizações. */
 function contadores() {
   const ref = hoje();
-  const n = D.todos().filter(it => D.situacao(it, ref) === "atrasada").length;
-  document.querySelectorAll(".conta-atrasadas").forEach(c => {
+  const conta = (seletor, n) => document.querySelectorAll(seletor).forEach(c => {
     c.textContent = n ? String(n) : "";
     c.title = n ? `${n} atrasada(s)` : "";
   });
+  conta(".conta-atrasadas", D.todos().filter(it => D.situacao(it, ref) === "atrasada").length);
+  conta(".conta-mob", M.todas().flatMap(m => m.frotas).filter(f => M.atrasada(f, ref)).length);
 }
 
 // ── tema ─────────────────────────────────────────────────────────────────────
@@ -65,7 +79,7 @@ D.quandoMudar(ok => {
 });
 aoRedesenhar(desenhar, desenharCorpo);
 
-document.getElementById("nova").addEventListener("click", () => abrirFormulario(null, { data: ui.vista === "agenda" ? ui.dia : hoje() }));
+document.getElementById("nova").addEventListener("click", () => nova.acao());
 document.getElementById("tema").addEventListener("click", trocarTema);
 window.addEventListener("hashchange", () => { fechar(); desenhar(); });
 
@@ -78,7 +92,7 @@ document.addEventListener("keydown", e => {
   if (e.key.toLowerCase() !== "n" || e.ctrlKey || e.metaKey || e.altKey || caixa.open) return;
   if (e.target.closest("input, textarea, select, [contenteditable]")) return;
   e.preventDefault();
-  abrirFormulario(null, { data: ui.vista === "agenda" ? ui.dia : hoje() });
+  nova.acao();
 });
 
 // outra aba mudou os dados: carrega de novo

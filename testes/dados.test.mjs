@@ -152,7 +152,7 @@ test("backup: baixar, juntar, substituir e ignorar o incompleto", () => {
   D.apagarTudo();
   novo({ atividade: "local" });
   const r = D.restaurarBackup(copia);
-  assert.deepEqual(r, { novos: 1, atualizados: 0, ignorados: 0 });
+  assert.deepEqual(r, { novos: 1, atualizados: 0, ignorados: 0, mobNovas: 0, mobAtualizadas: 0, mobIgnoradas: 0 });
   assert.equal(D.todos().length, 2);
   const volta = D.porId(a.id);
   assert.equal(volta.concluidaEm, "2026-10-21");
@@ -163,7 +163,7 @@ test("backup: baixar, juntar, substituir e ignorar o incompleto", () => {
 
   const lixo = JSON.stringify({ itens: [{ atividade: "", data: "x" }, { atividade: "ok", data: "2026-10-01", status: "inventado" }] });
   const r2 = D.restaurarBackup(lixo, true);
-  assert.deepEqual(r2, { novos: 1, atualizados: 0, ignorados: 1 });
+  assert.deepEqual(r2, { novos: 1, atualizados: 0, ignorados: 1, mobNovas: 0, mobAtualizadas: 0, mobIgnoradas: 0 });
   assert.equal(D.todos()[0].status, "programada");
 
   assert.throws(() => D.restaurarBackup('{"outra":"coisa"}'), /não é um backup/);
