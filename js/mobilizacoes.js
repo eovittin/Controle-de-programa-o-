@@ -6,7 +6,8 @@
 import { banco, gravar } from "./armazem.js";
 import { hoje, ehData, texto, normalizaFrota, semAcento, novoId, brCurto, dataPlanilha, csv } from "./util.js";
 
-export const TIPOS = ["Cavalo mecânico", "Carreta", "Bitrem", "Truck", "Toco", "Utilitário", "Veículo leve", "Outro"];
+export const TIPOS = ["Cavalo mecânico", "Bitrem", "Prancha 04 eixos", "Prancha 04 eixos com dolly", "Prancha 05 eixos",
+  "Prancha 06 eixos", "Prancha 06 eixos com dolly", "Linha de eixo", "Carga seca", "Veículo leve", "Outro"];
 
 /** A situação da frota é escolhida por quem usa, um passo de cada vez. */
 export const SITUACOES_FROTA = {
@@ -119,7 +120,8 @@ export function conferirFrota(d, m = null, id = null) {
   const limpo = {
     frota: normalizaFrota(d.frota),
     placa: normalizaPlaca(d.placa),
-    tipo: TIPOS.includes(d.tipo) ? d.tipo : "",
+    // aceita também um tipo que saiu de TIPOS: a frota que já o tinha não perde
+    tipo: texto(d.tipo, 40),
     motorista: texto(d.motorista, 80),
     situacao: d.situacao in SITUACOES_FROTA ? d.situacao : "aguardando",
     dataMobilizacao: String(d.dataMobilizacao || ""),

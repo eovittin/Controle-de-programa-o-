@@ -77,8 +77,11 @@ Dentro de cada mobilização, **+ Adicionar frota**:
 
 - **Frota** (obrigatória — "617" vira "F-617") e **placa** (ABC1D23 ou
   ABC1234). A frota que já foi mobilizada antes traz a placa e o tipo sozinha.
-- **Tipo de veículo** — Cavalo mecânico, Carreta, Bitrem, Truck, Toco,
-  Utilitário, Veículo leve, Outro.
+- **Tipo de veículo** — Cavalo mecânico, Bitrem, Prancha 04 eixos, Prancha 04
+  eixos com dolly, Prancha 05 eixos, Prancha 06 eixos, Prancha 06 eixos com
+  dolly, Linha de eixo, Carga seca, Veículo leve, Outro. A frota cadastrada
+  com um tipo que saiu da lista continua com ele (aparece como *tipo antigo*)
+  até alguém escolher outro.
 - **Motorista**.
 - **Situação** — Aguardando, Em mobilização, Mobilizada, Desmobilizada.
 - **Datas** — a de mobilização e a de desmobilização. Enquanto não aconteceu,

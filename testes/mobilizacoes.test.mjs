@@ -25,7 +25,7 @@ test("conferir a mobilização: nome obrigatório e datas em ordem", () => {
 test("conferir a frota: frota, placa, tipo e as datas que cada situação pede", () => {
   D.apagarTudo();
   const m = mob();
-  const ok = M.conferirFrota({ frota: " 617 ", placa: "abc-1d23", tipo: "Carreta", motorista: " Zé  Carlos " }, m);
+  const ok = M.conferirFrota({ frota: " 617 ", placa: "abc-1d23", tipo: "Prancha 04 eixos", motorista: " Zé  Carlos " }, m);
   assert.deepEqual(ok.erros, {});
   assert.equal(ok.limpo.frota, "F-617");
   assert.equal(ok.limpo.placa, "ABC1D23");
@@ -33,7 +33,8 @@ test("conferir a frota: frota, placa, tipo e as datas que cada situação pede",
   assert.equal(ok.limpo.situacao, "aguardando");
   assert.equal(M.conferirFrota({ frota: "1", placa: "ABC1234" }).erros.placa, undefined, "placa antiga vale");
   assert.ok(M.conferirFrota({ frota: "1", placa: "AB12" }).erros.placa);
-  assert.equal(M.conferirFrota({ frota: "1", tipo: "Foguete" }).limpo.tipo, "");
+  assert.equal(M.conferirFrota({ frota: "1", tipo: " Carreta " }).limpo.tipo, "Carreta", "tipo que saiu da lista continua");
+  assert.ok(!M.TIPOS.includes("Carreta") && M.TIPOS.includes("Linha de eixo"));
   assert.ok(M.conferirFrota({ frota: "" }).erros.frota);
   assert.ok(M.conferirFrota({ frota: "1", situacao: "mobilizada" }).erros.dataMobilizacao);
   const desm = M.conferirFrota({ frota: "1", situacao: "desmobilizada", dataMobilizacao: "2026-10-20" }).erros;
@@ -154,12 +155,12 @@ test("carregar ignora mobilização ilegível", () => {
 test("planilha das mobilizações: uma linha por frota", () => {
   D.apagarTudo();
   const m = mob({ nome: "Contrato; com ponto e vírgula" });
-  frota(m, { frota: "617", placa: "ABC1D23", tipo: "Carreta", motorista: "Zé", dataMobilizacao: "2026-10-20" });
+  frota(m, { frota: "617", placa: "ABC1D23", tipo: "Prancha 06 eixos com dolly", motorista: "Zé", dataMobilizacao: "2026-10-20" });
   frota(m, { frota: "620" });
   mob({ nome: "Vazia" });
   const linhas = M.planilha(M.todas(), "2026-10-25").split("\r\n");
   assert.ok(linhas[0].startsWith("﻿Mobilização;Local;"));
   assert.equal(linhas.length, 4);
-  assert.equal(linhas[1], '"Contrato; com ponto e vírgula";Alto do Rodrigues;20/10/2026;;Planejada;F-617;ABC1D23;Carreta;Zé;Aguardando;20/10/2026;;Sim');
+  assert.equal(linhas[1], '"Contrato; com ponto e vírgula";Alto do Rodrigues;20/10/2026;;Planejada;F-617;ABC1D23;Prancha 06 eixos com dolly;Zé;Aguardando;20/10/2026;;Sim');
   assert.ok(linhas[3].startsWith("Vazia;Alto do Rodrigues;20/10/2026;;Sem frotas;;"));
 });

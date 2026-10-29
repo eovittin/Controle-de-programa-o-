@@ -220,7 +220,10 @@ export function abrirFrota(m, f = null, preset = {}) {
   const motorista = entrada("motorista", base.motorista, { list: "sug-mob-motorista", placeholder: "Nome do motorista" });
   const dataMob = entrada("dataMobilizacao", base.dataMobilizacao, { type: "date" });
   const dataDesmob = entrada("dataDesmobilizacao", base.dataDesmobilizacao, { type: "date" });
-  const segTipo = segmentos(M.TIPOS.map(t => [t, t]), tipo, v => { tipo = v; }, { rotulo: "Tipo", classe: "chips" });
+  // a frota com um tipo que saiu da lista continua com ele até escolher outro
+  const tipos = !tipo || M.TIPOS.includes(tipo) ? M.TIPOS : [...M.TIPOS, tipo];
+  const segTipo = segmentos(tipos.map(t => [t, M.TIPOS.includes(t) ? t : `${t} (tipo antigo)`]), tipo, v => { tipo = v; },
+    { rotulo: "Tipo", classe: "chips" });
   const campoMob = campo("", dataMob, { nome: "dataMobilizacao" });
   const campoDesmob = campo("", dataDesmob, { nome: "dataDesmobilizacao" });
   const verDatas = () => {
