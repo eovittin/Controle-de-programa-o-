@@ -8,6 +8,7 @@ import * as T from "./telas.js";
 import * as M from "./mobilizacoes.js";
 import { mobilizacoes } from "./tela-mobilizacoes.js";
 import { abrirFormulario, fechar } from "./caixas.js";
+import { receber } from "./transferir.js";
 import { avisar } from "./ui.js";
 
 const TELAS = { agenda: T.agenda, semana: T.semana, lista: T.lista, mobilizacoes, dados: T.dados };
@@ -81,7 +82,7 @@ aoRedesenhar(desenhar, desenharCorpo);
 
 document.getElementById("nova").addEventListener("click", () => nova.acao());
 document.getElementById("tema").addEventListener("click", trocarTema);
-window.addEventListener("hashchange", () => { fechar(); desenhar(); });
+window.addEventListener("hashchange", () => { fechar(); receber(); desenhar(); });
 
 // fechar a caixa ao tocar fora dela
 const caixa = document.getElementById("caixa");
@@ -108,6 +109,7 @@ document.addEventListener("visibilitychange", () => {
   if (!caixa.open) redesenhar();
 });
 
+receber();   // abriu por um link de transferência?
 desenhar();
 
 // funciona sem internet depois da primeira visita

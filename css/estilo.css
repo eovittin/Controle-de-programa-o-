@@ -338,6 +338,8 @@ input.busca:focus { background-color: var(--papel); }
 .dados-num b { font-size: 22px; color: var(--texto); }
 .botoes { display: flex; flex-wrap: wrap; gap: 8px; }
 .dados .cartao > div > button { margin-top: 12px; }
+.passos { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.link-transferencia { width: 100%; font: 12px/1.4 ui-monospace, monospace; word-break: break-all; color: var(--fraco); }
 
 /* ── a caixa (dialog) ───────────────────────────────────────────────────── */
 dialog#caixa {

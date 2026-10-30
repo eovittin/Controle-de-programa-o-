@@ -9,6 +9,7 @@ import { ui, redesenhar } from "./estado.js";
 import { filtrados, barraFiltros, linhaItem, vazio, cartao } from "./comum.js";
 import { abrirFicha, abrirFormulario, confirmar } from "./caixas.js";
 import { icone, avisar, baixar, seloSituacao } from "./ui.js";
+import { abrirEnviar, resumoRestauracao } from "./transferir.js";
 
 const nav = (anterior, rotulo, proximo, rotuloSetas) => el("div", { class: "nav" },
   el("button", { type: "button", class: "seta", "aria-label": `${rotuloSetas} anterior`, onclick: anterior }, "‹"),
@@ -304,11 +305,7 @@ export const dados = {
       try {
         const r = D.restaurarBackup(await f.text(), substituir);
         redesenhar();
-        const partes = [`programações: ${r.novos} novas, ${r.atualizados} atualizadas`];
-        if (r.mobNovas || r.mobAtualizadas) partes.push(`mobilizações: ${r.mobNovas} novas, ${r.mobAtualizadas} atualizadas`);
-        const ignoradas = r.ignorados + r.mobIgnoradas;
-        avisar(`Backup restaurado — ${partes.join("; ")}` + (ignoradas ? `; ${ignoradas} ignorada(s) por estarem incompletas` : "") + ".",
-          { tempo: 9000 });
+        avisar(resumoRestauracao(r), { tempo: 9000 });
       } catch (e) {
         avisar(e instanceof SyntaxError ? "Esse arquivo não é um backup (.json) válido." : e.message, { tempo: 8000 });
       }
@@ -327,11 +324,15 @@ export const dados = {
       cartao("Onde ficam os seus dados", el("div", {},
         el("p", {}, "Tudo fica guardado ", el("b", {}, "neste navegador, neste aparelho"),
           ". Ninguém mais vê, e nada vai para a internet. Se você limpar os dados do navegador, a programação e as mobilizações vão junto — por isso baixe um backup de vez em quando."),
-        el("p", {}, "Para usar em outro aparelho: baixe o backup aqui e restaure lá."),
+        el("p", {}, "Para levar para outro aparelho, use ", el("b", {}, "Enviar para outro aparelho"), ", logo abaixo."),
         el("p", { class: "dados-num" }, el("b", {}, String(n)), " ", n === 1 ? "programação" : "programações",
           " · ", el("b", {}, String(nm)), " ", nm === 1 ? "mobilização" : "mobilizações", nf ? ` (${plural(nf, "frota", "frotas")})` : ""))),
+      cartao("Passar para outro aparelho", el("div", {},
+        el("p", {}, "Gera um link com tudo o que está neste aparelho. Mande o link para você mesmo e abra no outro aparelho: lá, o site pergunta se quer juntar."),
+        el("button", { type: "button", class: "primario", disabled: !tem, onclick: () => abrirEnviar() }, "Enviar para outro aparelho")),
+        { sub: "por um link, sem arquivo" }),
       cartao("Backup", el("div", { class: "botoes" },
-        el("button", { type: "button", class: "primario", disabled: !tem, onclick: () => {
+        el("button", { type: "button", disabled: !tem, onclick: () => {
           baixar(`backup-programacao-${hoje()}.json`, D.backup(), "application/json");
           avisar("Backup baixado.");
         } }, icone("baixar"), "Baixar backup"),

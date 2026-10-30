@@ -118,7 +118,10 @@ Tudo fica **no navegador de quem usa** (`localStorage`). Ninguém mais vê, e
 nada vai para a internet. Por isso:
 
 - **cada aparelho tem a sua programação** — para passar de um para outro, use
-  *Dados e backup → Baixar backup* num e *Restaurar backup* no outro;
+  *Dados e backup → Enviar para outro aparelho*: o site gera um link com tudo
+  (comprimido, depois do `#`, que não vai para o GitHub), você manda para
+  você mesmo (WhatsApp, e-mail) e abre no outro aparelho, que pergunta se
+  junta. O backup em arquivo continua servindo para o mesmo;
 - **limpar os dados do navegador apaga a programação e as mobilizações** —
   baixe o backup de vez em quando;
 - em janela anônima o navegador não guarda (o site avisa).
@@ -160,6 +163,7 @@ veículo das mobilizações ficam em `TIPOS`, no começo de
 | `js/dados.js` | as programações: situações, conferir o formulário, remarcar, concluir; e o backup e o CSV |
 | `js/mobilizacoes.js` | as mobilizações e as frotas delas: situações, conferir, histórico, backup e CSV |
 | `js/telas.js` | Agenda, Semana, Lista e Dados |
+| `js/transferir.js` | passar os dados para outro aparelho por um link |
 | `js/tela-mobilizacoes.js` | a tela Mobilizações e as caixas de mobilização e de frota |
 | `js/caixas.js` | as caixas: nova/editar, ficha, concluir, cancelar, confirmar |
 | `js/comum.js` | o que as telas dividem: filtros e a linha de um item |

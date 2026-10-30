@@ -105,3 +105,32 @@ export function csv(linhas) {
   };
   return "﻿" + linhas.map(l => l.map(cel).join(";")).join("\r\n");
 }
+
+// ── texto ↔ link ─────────────────────────────────────────────────────────────
+// Para levar os dados de um aparelho para outro dentro de um link: o texto é
+// comprimido e vira base64 sem os caracteres que estragam um endereço. O
+// primeiro caractere diz como: "1" comprimido, "0" sem compressão (navegador
+// antigo, sem CompressionStream).
+
+function paraBase64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+const deBase64 = t => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+const passarPor = async (bytes, transformacao) =>
+  new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(transformacao)).arrayBuffer());
+
+export async function textoParaLink(texto) {
+  const bytes = new TextEncoder().encode(texto);
+  if (typeof CompressionStream === "undefined") return "0" + paraBase64(bytes);
+  return "1" + paraBase64(await passarPor(bytes, new CompressionStream("deflate-raw")));
+}
+
+export async function linkParaTexto(codigo) {
+  const bytes = deBase64(codigo.slice(1));
+  if (codigo[0] === "0") return new TextDecoder().decode(bytes);
+  if (codigo[0] !== "1") throw new Error("formato desconhecido");
+  if (typeof DecompressionStream === "undefined") throw new Error("Este navegador é antigo demais para abrir o link. Use o backup em arquivo.");
+  return new TextDecoder().decode(await passarPor(bytes, new DecompressionStream("deflate-raw")));
+}
