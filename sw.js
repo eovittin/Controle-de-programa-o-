@@ -4,7 +4,7 @@
 // tempo, busca a versão nova para a próxima vez. Mudou a lista de arquivos?
 // Acrescente aqui e suba a VERSAO.
 
-const VERSAO = "v3";
+const VERSAO = "v4";
 const ARQUIVOS = [
   "./", "index.html", "manifest.json", "logo.svg", "css/estilo.css",
   "js/app.js", "js/armazem.js", "js/caixas.js", "js/comum.js", "js/dados.js", "js/estado.js", "js/mobilizacoes.js",

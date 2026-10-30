@@ -60,7 +60,7 @@ const itens = banco.itens;
 export function carregar() {
   const lido = ler();
   troca(itens, Array.isArray(lido?.itens) ? lido.itens.filter(i => i && i.id && ehData(i.data)) : []);
-  troca(banco.mobilizacoes, Array.isArray(lido?.mobilizacoes) ? lido.mobilizacoes.filter(M.legivel) : []);
+  troca(banco.mobilizacoes, Array.isArray(lido?.mobilizacoes) ? lido.mobilizacoes.filter(M.legivel).map(M.atualizar) : []);
   return itens;
 }
 

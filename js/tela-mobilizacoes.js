@@ -35,7 +35,7 @@ export const mobilizacoes = {
     return el("div", { class: "barra" },
       el("input", {
         type: "search", class: "busca", value: ui.busca, "aria-label": "Buscar",
-        placeholder: "Buscar mobilização, frota, placa, motorista…",
+        placeholder: "Buscar mobilização, frota, carga, motorista…",
         oninput: e => { ui.busca = e.target.value; redesenharCorpo(); },
       }),
       el("select", { "aria-label": "Situação", onchange: e => { ui.filtroMob = e.target.value; redesenharCorpo(); } },
@@ -110,12 +110,12 @@ function datasDaFrota(f) {
 
 function linhaFrota(m, f, ref) {
   const atrasou = M.atrasada(f, ref);
-  const sub = [f.motorista, ...datasDaFrota(f)].filter(Boolean).join(" · ");
+  const sub = [f.carga ? "Carga: " + f.carga : "", f.motorista, ...datasDaFrota(f)].filter(Boolean).join(" · ");
   const prox = M.PROXIMO[f.situacao];
   return el("div", { class: "item m-" + (atrasou ? "atrasada" : f.situacao), dataset: { id: f.id }, onclick: () => abrirFrota(m, f) },
     el("i", { class: "ponto", "aria-hidden": "true" }),
     el("div", { class: "item-meio" },
-      el("button", { type: "button", class: "item-tit" }, el("b", {}, f.frota), [f.placa, f.tipo].filter(Boolean).map(t => " · " + t)),
+      el("button", { type: "button", class: "item-tit" }, el("b", {}, f.frota), f.tipo ? " · " + f.tipo : null),
       sub ? el("div", { class: "item-sub" }, sub) : null,
       el("div", { class: "item-pe", onclick: e => e.stopPropagation() },
         el("span", { class: "selo m-" + f.situacao }, M.SITUACOES_FROTA[f.situacao]),
@@ -216,7 +216,7 @@ export function abrirFrota(m, f = null, preset = {}) {
   let tipo = base.tipo || "", situacao = base.situacao;
 
   const frota = entrada("frota", base.frota, { list: "sug-mob-frota", placeholder: "Ex.: 617 ou F-617", autofocus: !f });
-  const placa = entrada("placa", base.placa, { placeholder: "ABC1D23", autocapitalize: "characters", maxlength: 8 });
+  const carga = entrada("carga", base.carga, { list: "sug-mob-carga", placeholder: "Ex.: transformador, tubos, máquinas…" });
   const motorista = entrada("motorista", base.motorista, { list: "sug-mob-motorista", placeholder: "Nome do motorista" });
   const dataMob = entrada("dataMobilizacao", base.dataMobilizacao, { type: "date" });
   const dataDesmob = entrada("dataDesmobilizacao", base.dataDesmobilizacao, { type: "date" });
@@ -232,20 +232,20 @@ export function abrirFrota(m, f = null, preset = {}) {
     campoDesmob.querySelector(".rot").textContent = b;
   };
 
-  // a frota que já foi mobilizada antes traz a placa e o tipo
+  // a frota que já foi mobilizada antes traz o tipo
   frota.addEventListener("change", () => {
     const k = M.conhecida(normalizaFrota(frota.value));
     if (!k) return;
-    if (!placa.value && k.placa) placa.value = k.placa;
     if (!tipo && k.tipo) segTipo.querySelectorAll(".seg").forEach(b => { if (b.textContent === k.tipo) b.click(); });
   });
 
   const form = el("form", { class: "form", novalidate: true, onsubmit: e => { e.preventDefault(); salvar(); } },
     lista("sug-mob-frota", M.sugestoes("frota", D.todos().map(i => i.frota))),
     lista("sug-mob-motorista", M.sugestoes("motorista", D.todos().map(i => i.responsavel))),
+    lista("sug-mob-carga", M.sugestoes("carga")),
     el("div", { class: "linha-2" },
       campo("Frota *", frota, { nome: "frota" }),
-      campo("Placa", placa, { nome: "placa" })),
+      campo("Carga", carga, { nome: "carga" })),
     campo("Tipo de veículo", segTipo, { nome: "tipo" }),
     campo("Motorista", motorista, { nome: "motorista" }),
     campo("Situação", segmentos(Object.entries(M.SITUACOES_FROTA), situacao, v => { situacao = v; verDatas(); },
@@ -259,7 +259,7 @@ export function abrirFrota(m, f = null, preset = {}) {
   let avisada = "";
 
   function salvar(outra = false) {
-    const { limpo, erros } = M.conferirFrota({ frota: frota.value, placa: placa.value, tipo, motorista: motorista.value,
+    const { limpo, erros } = M.conferirFrota({ frota: frota.value, carga: carga.value, tipo, motorista: motorista.value,
       situacao, dataMobilizacao: dataMob.value, dataDesmobilizacao: dataDesmob.value }, m, f?.id);
     if (!Object.keys(erros).length && limpo.frota !== f?.frota && avisada !== limpo.frota) {
       const em = M.emOutra(limpo.frota, m.id);

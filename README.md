@@ -75,8 +75,9 @@ alto da tela; ao criar, a caixa de adicionar frota já abre.
 
 Dentro de cada mobilização, **+ Adicionar frota**:
 
-- **Frota** (obrigatória — "617" vira "F-617") e **placa** (ABC1D23 ou
-  ABC1234). A frota que já foi mobilizada antes traz a placa e o tipo sozinha.
+- **Frota** (obrigatória — "617" vira "F-617") e **carga** (o que ela leva,
+  escrito livre; sugere as cargas já digitadas). A frota que já foi mobilizada
+  antes traz o tipo sozinha.
 - **Tipo de veículo** — Cavalo mecânico, Bitrem, Prancha 04 eixos, Prancha 04
   eixos com dolly, Prancha 05 eixos, Prancha 06 eixos, Prancha 06 eixos com
   dolly, Linha de eixo, Carga seca, Veículo leve, Outro. A frota cadastrada
@@ -105,7 +106,7 @@ conferir). Tocar na frota abre para editar ou **remover da mobilização** (com
 - A **situação da mobilização** sai das frotas: Sem frotas, Planejada,
   Mobilizando, Ativa ou Encerrada (todas desmobilizadas).
 - No alto, os números: mobilizações em andamento, frotas mobilizadas, em
-  mobilização, aguardando e atrasadas. A busca acha mobilização, frota, placa
+  mobilização, aguardando e atrasadas. A busca acha mobilização, frota, carga
   e motorista; o filtro mostra as em andamento, as encerradas ou todas;
   **Excel** baixa a lista com uma linha por frota.
 - Tudo o que muda fica no **histórico** da mobilização (em *Editar*):

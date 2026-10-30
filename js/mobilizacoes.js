@@ -1,5 +1,5 @@
 // As mobilizações: cada uma é um contrato, cliente ou obra para onde a
-// operação manda frotas. Dentro dela ficam as frotas, cada uma com placa,
+// operação manda frotas. Dentro dela ficam as frotas, cada uma com carga,
 // tipo, motorista, as datas e a situação. Como nas programações, as telas só
 // mudam pelas funções daqui, e cada mudança entra no histórico da mobilização.
 
@@ -57,7 +57,7 @@ export function contas(m) {
 
 export function casaBusca(m, termo) {
   if (!termo) return true;
-  const alvo = semAcento([m.nome, m.local, m.obs, ...m.frotas.flatMap(f => [f.frota, f.placa, f.tipo, f.motorista])].join(" "));
+  const alvo = semAcento([m.nome, m.local, m.obs, ...m.frotas.flatMap(f => [f.frota, f.carga, f.tipo, f.motorista])].join(" "));
   return semAcento(termo).split(/\s+/).filter(Boolean).every(p => alvo.includes(p));
 }
 
@@ -70,12 +70,12 @@ export function sugestoes(campo, extras = []) {
   return [...conta].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR", { numeric: true })).map(([v]) => v).slice(0, 60);
 }
 
-/** A placa e o tipo da última vez que a frota foi mobilizada — para não
- *  digitar de novo. */
+/** O tipo da última vez que a frota foi mobilizada — para não escolher de
+ *  novo. A carga muda a cada mobilização, por isso não vem junto. */
 export function conhecida(frota) {
   let achada = null;
-  for (const m of banco.mobilizacoes) for (const f of m.frotas) if (f.frota === frota && (f.placa || f.tipo)) achada = f;
-  return achada ? { placa: achada.placa, tipo: achada.tipo } : null;
+  for (const m of banco.mobilizacoes) for (const f of m.frotas) if (f.frota === frota && f.tipo) achada = f;
+  return achada ? { tipo: achada.tipo } : null;
 }
 
 /** A mesma frota em outra mobilização que ainda não a desmobilizou. */
@@ -89,10 +89,6 @@ export function emOutra(frota, mobId) {
 }
 
 // ── conferir o que veio do formulário ───────────────────────────────────────
-
-/** "abc-1d23" → "ABC1D23". */
-export const normalizaPlaca = v => String(v ?? "").toUpperCase().replace(/[\s-]/g, "").slice(0, 10);
-const PLACA = /^[A-Z]{3}\d[A-Z0-9]\d{2}$/;   // a antiga (ABC1234) e a Mercosul (ABC1D23)
 
 function conferirDatas(limpo, erros, de, ate, rotuloAte) {
   if (limpo[de] && !ehData(limpo[de])) erros[de] = "Data inválida.";
@@ -119,7 +115,9 @@ export function conferirMob(d) {
 export function conferirFrota(d, m = null, id = null) {
   const limpo = {
     frota: normalizaFrota(d.frota),
-    placa: normalizaPlaca(d.placa),
+    // o que a frota leva, escrito do jeito que for (até 30/10/2026 o campo
+    // era a placa: backup antigo traz "placa")
+    carga: texto(d.carga ?? d.placa, 120),
     // aceita também um tipo que saiu de TIPOS: a frota que já o tinha não perde
     tipo: texto(d.tipo, 40),
     motorista: texto(d.motorista, 80),
@@ -130,7 +128,6 @@ export function conferirFrota(d, m = null, id = null) {
   const erros = {};
   if (!limpo.frota) erros.frota = "Qual frota?";
   else if (m && m.frotas.some(f => f.frota === limpo.frota && f.id !== id)) erros.frota = `${limpo.frota} já está nesta mobilização — edite a que já existe.`;
-  if (limpo.placa && !PLACA.test(limpo.placa)) erros.placa = "Placa no formato ABC1D23 ou ABC1234.";
   conferirDatas(limpo, erros, "dataMobilizacao", "dataDesmobilizacao", "A desmobilização");
   if (!erros.dataMobilizacao && !limpo.dataMobilizacao && (limpo.situacao === "mobilizada" || limpo.situacao === "desmobilizada")) {
     erros.dataMobilizacao = "Em que dia a frota chegou?";
@@ -147,7 +144,7 @@ const agora = () => new Date().toISOString();
 const anota = (m, txt) => { (m.historico ||= []).push({ quando: agora(), texto: txt }); };
 
 const ROTULOS_MOB = { nome: "nome", local: "local", inicio: "início", fimPrevisto: "fim previsto", obs: "observações" };
-const ROTULOS_FROTA = { frota: "frota", placa: "placa", tipo: "tipo", motorista: "motorista",
+const ROTULOS_FROTA = { frota: "frota", carga: "carga", tipo: "tipo", motorista: "motorista",
   dataMobilizacao: "data de mobilização", dataDesmobilizacao: "data de desmobilização" };
 const mudou = (antes, depois, rotulos, fora = []) => Object.keys(rotulos)
   .filter(k => !fora.includes(k) && (antes[k] || "") !== (depois[k] || "")).map(k => rotulos[k]);
@@ -234,6 +231,12 @@ export function devolverFrota({ mobId, f, pos }) {
 /** O que veio do navegador tem o mínimo para a tela não quebrar? */
 export const legivel = m => !!m && typeof m.id === "string" && typeof m.nome === "string" && Array.isArray(m.frotas);
 
+/** A frota guardada até 30/10/2026 tinha "placa" onde hoje é "carga". */
+export function atualizar(m) {
+  for (const f of m.frotas) if (f.carga === undefined && "placa" in f) { f.carga = f.placa; delete f.placa; }
+  return m;
+}
+
 const historico = h => Array.isArray(h)
   ? h.filter(x => x && typeof x.texto === "string").map(x => ({ quando: String(x.quando || ""), texto: x.texto }))
   : [];
@@ -266,14 +269,14 @@ export function sanear(lista) {
 /** As mobilizações em CSV: uma linha por frota (a mobilização sem frota
  *  também sai, numa linha só). */
 export function planilha(lista, ref = hoje()) {
-  const cab = ["Mobilização", "Local", "Início", "Fim previsto", "Situação da mobilização", "Frota", "Placa", "Tipo",
+  const cab = ["Mobilização", "Local", "Início", "Fim previsto", "Situação da mobilização", "Frota", "Carga", "Tipo",
     "Motorista", "Situação da frota", "Mobilização da frota", "Desmobilização da frota", "Atrasada"];
   const linhas = [];
   for (const m of lista) {
     const base = [m.nome, m.local, dataPlanilha(m.inicio), dataPlanilha(m.fimPrevisto), SITUACOES_MOB[situacaoMob(m)]];
     if (!m.frotas.length) linhas.push([...base, "", "", "", "", "", "", "", ""]);
     for (const f of m.frotas) {
-      linhas.push([...base, f.frota, f.placa, f.tipo, f.motorista, SITUACOES_FROTA[f.situacao],
+      linhas.push([...base, f.frota, f.carga, f.tipo, f.motorista, SITUACOES_FROTA[f.situacao],
         dataPlanilha(f.dataMobilizacao), dataPlanilha(f.dataDesmobilizacao), atrasada(f, ref) ? "Sim" : ""]);
     }
   }

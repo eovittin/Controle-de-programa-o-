@@ -22,17 +22,18 @@ test("conferir a mobilização: nome obrigatório e datas em ordem", () => {
   assert.deepEqual(M.conferirMob({ nome: "x", fimPrevisto: "2026-10-19" }).erros, {}, "fim sem início vale");
 });
 
-test("conferir a frota: frota, placa, tipo e as datas que cada situação pede", () => {
+test("conferir a frota: frota, carga, tipo e as datas que cada situação pede", () => {
   D.apagarTudo();
   const m = mob();
-  const ok = M.conferirFrota({ frota: " 617 ", placa: "abc-1d23", tipo: "Prancha 04 eixos", motorista: " Zé  Carlos " }, m);
+  const ok = M.conferirFrota({ frota: " 617 ", carga: "  Transformador   40t ", tipo: "Prancha 04 eixos", motorista: " Zé  Carlos " }, m);
   assert.deepEqual(ok.erros, {});
   assert.equal(ok.limpo.frota, "F-617");
-  assert.equal(ok.limpo.placa, "ABC1D23");
+  assert.equal(ok.limpo.carga, "Transformador 40t");
   assert.equal(ok.limpo.motorista, "Zé Carlos");
   assert.equal(ok.limpo.situacao, "aguardando");
-  assert.equal(M.conferirFrota({ frota: "1", placa: "ABC1234" }).erros.placa, undefined, "placa antiga vale");
-  assert.ok(M.conferirFrota({ frota: "1", placa: "AB12" }).erros.placa);
+  assert.deepEqual(M.conferirFrota({ frota: "1", carga: 'ab12 / tubos de 6"' }).erros, {}, "carga é texto livre");
+  assert.equal(M.conferirFrota({ frota: "1", carga: 'ab12 / tubos de 6"' }).limpo.carga, 'ab12 / tubos de 6"', "do jeito que foi escrita");
+  assert.equal(M.conferirFrota({ frota: "1", placa: "ABC1D23" }).limpo.carga, "ABC1D23", "backup antigo: a placa vira carga");
   assert.equal(M.conferirFrota({ frota: "1", tipo: " Carreta " }).limpo.tipo, "Carreta", "tipo que saiu da lista continua");
   assert.ok(!M.TIPOS.includes("Carreta") && M.TIPOS.includes("Linha de eixo"));
   assert.ok(M.conferirFrota({ frota: "" }).erros.frota);
@@ -80,7 +81,7 @@ test("atrasada: passou do dia previsto e não chegou", () => {
 test("histórico: adicionar, trocar de situação, editar e remover", () => {
   D.apagarTudo();
   const m = mob();
-  const f = frota(m, { placa: "ABC1D23" });
+  const f = frota(m, { carga: "Tubos" });
   M.editarFrota(m.id, f.id, M.conferirFrota({ ...f, situacao: "mobilizada", dataMobilizacao: "2026-10-22" }).limpo);
   M.editarFrota(m.id, f.id, M.conferirFrota({ ...f, motorista: "Zé" }).limpo);
   const guardada = M.removerFrota(m.id, f.id);
@@ -97,14 +98,14 @@ test("histórico: adicionar, trocar de situação, editar e remover", () => {
   ]);
 });
 
-test("frota em outra mobilização e a placa já conhecida", () => {
+test("frota em outra mobilização e o tipo já conhecido", () => {
   D.apagarTudo();
   const a = mob({ nome: "Contrato A" });
   const b = mob({ nome: "Contrato B" });
-  const f = frota(a, { placa: "ABC1D23", tipo: "Cavalo mecânico" });
+  const f = frota(a, { carga: "Tubos", tipo: "Cavalo mecânico" });
   assert.equal(M.emOutra("F-617", b.id).m.id, a.id);
   assert.equal(M.emOutra("F-617", a.id), null, "na própria não conta");
-  assert.deepEqual(M.conhecida("F-617"), { placa: "ABC1D23", tipo: "Cavalo mecânico" });
+  assert.deepEqual(M.conhecida("F-617"), { tipo: "Cavalo mecânico" });
   M.editarFrota(a.id, f.id, M.conferirFrota({ ...f, situacao: "desmobilizada", dataMobilizacao: "2026-10-20", dataDesmobilizacao: "2026-10-25" }).limpo);
   assert.equal(M.emOutra("F-617", b.id), null, "desmobilizada está livre");
 });
@@ -124,13 +125,13 @@ test("excluir a mobilização e desfazer", () => {
 test("backup leva as mobilizações; backup antigo não mexe nelas", () => {
   D.apagarTudo();
   const m = mob();
-  frota(m, { placa: "ABC1D23" });
+  frota(m, { carga: "Transformador" });
   const copia = D.backup();
 
   D.apagarTudo();
   const r = D.restaurarBackup(copia);
   assert.equal(r.mobNovas, 1);
-  assert.equal(M.todas()[0].frotas[0].placa, "ABC1D23");
+  assert.equal(M.todas()[0].frotas[0].carga, "Transformador");
   assert.equal(M.todas()[0].historico.length, 2);
   assert.equal(D.restaurarBackup(copia).mobAtualizadas, 1);
 
@@ -139,11 +140,16 @@ test("backup leva as mobilizações; backup antigo não mexe nelas", () => {
   assert.equal(M.todas().length, 1);
 
   // o que não passa na conferência fica de fora
-  const ruim = JSON.stringify({ itens: [], mobilizacoes: [{ nome: "" }, { nome: "Boa", frotas: [{ frota: "" }, { frota: "9", placa: "?" }, { frota: "10" }] }] });
+  const ruim = JSON.stringify({ itens: [], mobilizacoes: [{ nome: "" }, { nome: "Boa", frotas: [{ frota: "" }, { frota: "9", dataMobilizacao: "ontem" }, { frota: "10" }] }] });
   const r2 = D.restaurarBackup(ruim, true);
   assert.equal(r2.mobIgnoradas, 1);
   assert.equal(M.todas().length, 1);
   assert.deepEqual(M.todas()[0].frotas.map(f => f.frota), ["F-10"]);
+});
+
+test("a frota guardada com placa passa a ter carga", () => {
+  const m = M.atualizar({ id: "a", nome: "x", frotas: [{ frota: "F-1", placa: "ABC1D23" }, { frota: "F-2", carga: "Tubos" }] });
+  assert.deepEqual(m.frotas, [{ frota: "F-1", carga: "ABC1D23" }, { frota: "F-2", carga: "Tubos" }]);
 });
 
 test("carregar ignora mobilização ilegível", () => {
@@ -155,12 +161,12 @@ test("carregar ignora mobilização ilegível", () => {
 test("planilha das mobilizações: uma linha por frota", () => {
   D.apagarTudo();
   const m = mob({ nome: "Contrato; com ponto e vírgula" });
-  frota(m, { frota: "617", placa: "ABC1D23", tipo: "Prancha 06 eixos com dolly", motorista: "Zé", dataMobilizacao: "2026-10-20" });
+  frota(m, { frota: "617", carga: "Transformador 40t", tipo: "Prancha 06 eixos com dolly", motorista: "Zé", dataMobilizacao: "2026-10-20" });
   frota(m, { frota: "620" });
   mob({ nome: "Vazia" });
   const linhas = M.planilha(M.todas(), "2026-10-25").split("\r\n");
   assert.ok(linhas[0].startsWith("﻿Mobilização;Local;"));
   assert.equal(linhas.length, 4);
-  assert.equal(linhas[1], '"Contrato; com ponto e vírgula";Alto do Rodrigues;20/10/2026;;Planejada;F-617;ABC1D23;Prancha 06 eixos com dolly;Zé;Aguardando;20/10/2026;;Sim');
+  assert.equal(linhas[1], '"Contrato; com ponto e vírgula";Alto do Rodrigues;20/10/2026;;Planejada;F-617;Transformador 40t;Prancha 06 eixos com dolly;Zé;Aguardando;20/10/2026;;Sim');
   assert.ok(linhas[3].startsWith("Vazia;Alto do Rodrigues;20/10/2026;;Sem frotas;;"));
 });
