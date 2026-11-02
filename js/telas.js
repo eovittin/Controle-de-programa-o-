@@ -8,7 +8,7 @@ import * as M from "./mobilizacoes.js";
 import { ui, redesenhar } from "./estado.js";
 import { filtrados, barraFiltros, linhaItem, vazio, cartao } from "./comum.js";
 import { abrirFicha, abrirFormulario, confirmar } from "./caixas.js";
-import { icone, avisar, baixar, seloSituacao } from "./ui.js";
+import { icone, avisar, baixar, seloDe } from "./ui.js";
 import { abrirEnviar, resumoRestauracao } from "./transferir.js";
 
 const nav = (anterior, rotulo, proximo, rotuloSetas) => el("div", { class: "nav" },
@@ -105,14 +105,14 @@ export const agenda = {
             onclick: e => { e.stopPropagation(); escolher(d); } }, String(Number(d.slice(8))))),
         el("div", { class: "dia-evs" },
           doDia.slice(0, cabem).map(it => el("button", {
-            type: "button", class: "ev s-" + D.situacao(it, ref), title: `${D.titulo(it)} — ${D.SITUACOES[D.situacao(it, ref)]}`,
+            type: "button", class: "ev s-" + D.situacaoDia(it, d, ref), title: `${D.titulo(it)} — ${D.SITUACOES[D.situacaoDia(it, d, ref)]}`,
             onclick: e => { e.stopPropagation(); abrirFicha(it.id); } },
             it.horaInicio && d === it.data ? el("span", { class: "ev-hora" }, it.horaInicio) : null,
             it.frota ? el("b", {}, it.frota) : null, " ", it.atividade)),
           doDia.length > cabem ? el("button", { type: "button", class: "ev-mais", onclick: e => { e.stopPropagation(); escolher(d); } },
             `+${doDia.length - cabem} mais`) : null),
         doDia.length ? el("div", { class: "pontos", "aria-hidden": "true" },
-          doDia.slice(0, 4).map(it => el("i", { class: "s-" + D.situacao(it, ref) }))) : null));
+          doDia.slice(0, 4).map(it => el("i", { class: "s-" + D.situacaoDia(it, d, ref) }))) : null));
     }
 
     const legenda = el("div", { class: "legenda" }, ["programada", "hoje", "andamento", "atrasada", "concluida", "cancelada"]
@@ -121,7 +121,7 @@ export const agenda = {
     // a coluna da direita: o dia tocado, as atrasadas e o resumo do mês
     const doDia = lista.filter(it => D.noPeriodo(it, ui.dia, ui.dia)).sort(D.ordemDoDia);
     const cDia = cartao(ui.dia === ref ? "Hoje" : "Dia", el("div", { class: "lista-itens" },
-      doDia.length ? doDia.map(it => linhaItem(it, { ref })) : vazio("Nada programado neste dia.")), {
+      doDia.length ? doDia.map(it => linhaItem(it, { ref, dia: ui.dia })) : vazio("Nada programado neste dia.")), {
       sub: porExtenso(ui.dia),
       pe: el("button", { type: "button", class: "largo", onclick: () => abrirFormulario(null, { data: ui.dia }) }, "+ Programar neste dia"),
     });
@@ -196,7 +196,7 @@ export const semana = {
 };
 
 function cartaoSemana(it, d, ref) {
-  const s = D.situacao(it, ref);
+  const s = D.situacaoDia(it, d, ref);
   const total = difDias(it.data, D.prazo(it)) + 1;
   const parte = total > 1 ? `dia ${difDias(it.data, d) + 1} de ${total}` : "";
   const hora = it.horaInicio && d === it.data ? D.horario(it) : "";
@@ -205,7 +205,7 @@ function cartaoSemana(it, d, ref) {
       it.prioridade === "alta" ? el("span", { class: "tag alta" }, "Alta") : null),
     el("div", { class: "sem-tit" }, it.frota ? el("b", {}, it.frota + " ") : null, it.atividade),
     it.onde || it.responsavel ? el("div", { class: "sem-sub" }, [it.onde, it.responsavel].filter(Boolean).join(" · ")) : null,
-    el("div", { class: "sem-pe" }, el("span", { class: "sem-cat" }, D.nomeCategoria(it.categoria)), seloSituacao(it, ref)));
+    el("div", { class: "sem-pe" }, el("span", { class: "sem-cat" }, D.nomeCategoria(it.categoria)), seloDe(s)));
 }
 
 // ── Lista ────────────────────────────────────────────────────────────────────

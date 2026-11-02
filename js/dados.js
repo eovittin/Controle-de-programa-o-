@@ -72,13 +72,30 @@ export const porId = id => itens.find(i => i.id === id);
 /** O último dia do item: o "até", quando ele dura mais de um dia. */
 export const prazo = it => (it.dataFim && it.dataFim > it.data ? it.dataFim : it.data);
 
+/** Dura mais de um dia? Então cada dia se conclui separado: os feitos ficam em
+ *  `it.dias` ({ "2026-11-02": { em, motivo?, detalhe? } }), e o item se
+ *  conclui sozinho quando o último dia é feito. */
+export const variosDias = it => prazo(it) > it.data;
+export const diasPendentes = it => diasDo(it).filter(d => !it.dias?.[d]);
+
 export function situacao(it, ref = hoje()) {
   if (it.status === "cancelada") return "cancelada";
   if (it.status === "concluida") return it.concluidaEm && it.concluidaEm > prazo(it) ? "concluida-atraso" : "concluida";
-  if (prazo(it) < ref) return "atrasada";
+  // de vários dias, atrasa assim que um dia que já passou ficou sem fazer
+  if (variosDias(it) ? diasPendentes(it).some(d => d < ref) : prazo(it) < ref) return "atrasada";
   if (it.status === "andamento") return "andamento";
   if (it.data <= ref) return "hoje";
   return "programada";
+}
+
+/** A situação de um dia do item: a cor dele naquele dia do calendário. */
+export function situacaoDia(it, dia, ref = hoje()) {
+  if (!variosDias(it) || it.status === "cancelada" || it.status === "concluida") return situacao(it, ref);
+  const feito = it.dias?.[dia];
+  if (feito) return feito.em > dia ? "concluida-atraso" : "concluida";
+  if (dia < ref) return "atrasada";
+  if (dia > ref) return "programada";
+  return it.status === "andamento" ? "andamento" : "hoje";
 }
 
 /** Os dias em que o item aparece no calendário (até 62, para um "até" errado
@@ -202,6 +219,11 @@ export function editar(id, limpo, motivo = "") {
   }
   if (mudou.length) anota(it, "Editada: " + mudou.join(", "));
   Object.assign(it, limpo);
+  // os dias feitos que saíram do período não contam mais
+  if (it.dias) {
+    if (!variosDias(it)) delete it.dias;
+    else for (const d of Object.keys(it.dias)) if (d < it.data || d > prazo(it)) delete it.dias[d];
+  }
   salvar();
   return it;
 }
@@ -231,10 +253,43 @@ export function concluir(id, quando, motivo = "", detalhe = "") {
   salvar();
 }
 
+/** Conclui um dia de um item de vários dias, feito em `quando`. Feito o
+ *  último, o item se conclui (no dia do último feito). */
+export function concluirDia(id, dia, quando, motivo = "", detalhe = "") {
+  const it = porId(id);
+  const atraso = difDias(dia, quando);
+  const det = texto(detalhe, 300);
+  (it.dias ||= {})[dia] = atraso > 0 ? { em: quando, motivo, ...(det ? { detalhe: det } : {}) } : { em: quando };
+  anota(it, `Dia ${brCurto(dia)} concluído` + (quando !== dia ? ` em ${brCurto(quando)}` : "") +
+    (atraso > 0 ? `, ${plural(atraso, "dia", "dias")} depois — ${motivo}` + (det ? ` (${det})` : "") : ""));
+  if (!diasPendentes(it).length) {
+    const ultimo = Object.values(it.dias).reduce((a, b) => (b.em > a.em ? b : a));
+    it.status = "concluida";
+    it.concluidaEm = ultimo.em;
+    if (ultimo.em > prazo(it)) { it.motivoAtraso = ultimo.motivo || ""; it.detalheAtraso = ultimo.detalhe || ""; }
+    else { delete it.motivoAtraso; delete it.detalheAtraso; }
+    anota(it, "Concluída: todos os dias feitos");
+  }
+  salvar();
+}
+
+/** Desfaz o feito de um dia; se o item estava concluído, volta a ficar aberto. */
+export function reabrirDia(id, dia) {
+  const it = porId(id);
+  delete it.dias?.[dia];
+  if (it.status === "concluida") {
+    it.status = "programada";
+    delete it.concluidaEm; delete it.motivoAtraso; delete it.detalheAtraso;
+  }
+  anota(it, `Dia ${brCurto(dia)} reaberto`);
+  salvar();
+}
+
+/** Reabre tudo: também os dias já feitos. */
 export function reabrir(id) {
   const it = porId(id);
   it.status = "programada";
-  delete it.concluidaEm; delete it.motivoAtraso; delete it.detalheAtraso;
+  delete it.concluidaEm; delete it.motivoAtraso; delete it.detalheAtraso; delete it.dias;
   anota(it, "Reaberta");
   salvar();
 }
@@ -282,6 +337,16 @@ export const backup = () => JSON.stringify({ app: "programacao-operacao", versao
 
 const STATUS = ["programada", "andamento", "concluida", "cancelada"];
 
+/** Os dias feitos de um backup, só os que fazem sentido. */
+function diasFeitos(bruto) {
+  const dias = {};
+  for (const [d, v] of Object.entries(bruto)) {
+    if (!ehData(d) || !v || !ehData(v.em)) continue;
+    dias[d] = { em: v.em, ...(v.motivo ? { motivo: texto(v.motivo) } : {}), ...(v.detalhe ? { detalhe: texto(v.detalhe, 300) } : {}) };
+  }
+  return dias;
+}
+
 /** Põe `novos` em `lista`: o mesmo id atualiza, o resto entra no fim. */
 function juntar(lista, novos) {
   let entraram = 0, atualizados = 0;
@@ -318,6 +383,7 @@ export function restaurarBackup(textoArquivo, substituir = false) {
       ...(bruto.motivoAtraso ? { motivoAtraso: texto(bruto.motivoAtraso), detalheAtraso: texto(bruto.detalheAtraso, 300) } : {}),
       ...(bruto.motivoCancelamento ? { motivoCancelamento: texto(bruto.motivoCancelamento, 300) } : {}),
       ...(typeof bruto.grupo === "string" ? { grupo: bruto.grupo } : {}),
+      ...(bruto.dias && typeof bruto.dias === "object" ? { dias: diasFeitos(bruto.dias) } : {}),
     });
     if (bons.at(-1).status === "concluida" && !bons.at(-1).concluidaEm) bons.at(-1).status = "programada";
   }
@@ -339,10 +405,11 @@ export function restaurarBackup(textoArquivo, substituir = false) {
 /** A lista em CSV para o Excel. */
 export function planilha(lista, ref = hoje()) {
   const cab = ["Dia", "Até", "Início", "Fim", "Frota", "Categoria", "O que fazer", "Onde", "Responsável",
-    "Prioridade", "Situação", "Concluída em", "Motivo do atraso", "Remarcações", "Observações"];
+    "Prioridade", "Situação", "Concluída em", "Motivo do atraso", "Remarcações", "Dias feitos", "Observações"];
   const br = dataPlanilha;
   const linhas = lista.map(it => [br(it.data), br(it.dataFim), it.horaInicio, it.horaFim, it.frota, nomeCategoria(it.categoria),
     it.atividade, it.onde, it.responsavel, nomePrioridade(it.prioridade), SITUACOES[situacao(it, ref)], br(it.concluidaEm),
-    [it.motivoAtraso, it.detalheAtraso].filter(Boolean).join(" — "), it.remarcacoes || 0, it.obs]);
+    [it.motivoAtraso, it.detalheAtraso].filter(Boolean).join(" — "), it.remarcacoes || 0,
+    variosDias(it) ? `${diasDo(it).length - diasPendentes(it).length}/${diasDo(it).length}` : "", it.obs]);
   return csv([cab, ...linhas]);
 }

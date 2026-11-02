@@ -32,7 +32,7 @@ também abre.
 - **O que fazer** (obrigatório), **Onde**, **Responsável**, **Prioridade**
   (Alta, Média, Baixa) e **Observações**.
 - **Dia** (obrigatório) e, se durar mais de um dia, **Até o dia** — a viagem de
-  três dias aparece nos três.
+  três dias aparece nos três, e **cada dia se conclui separado** (ver abaixo).
 - **Das / Às** — o horário, opcional.
 - **Repetir** (só na nova) — todo dia, dias úteis ou toda semana, até uma
   data. Cada repetição vira uma programação própria (no máximo 120 de uma vez).
@@ -52,6 +52,19 @@ A situação é calculada pela data — ninguém precisa marcar "atrasada".
 | Concluída | concluída até o último dia |
 | Concluída com atraso | concluída depois do último dia |
 | Cancelada | cancelada, com o motivo; não conta como feita nem como atrasada |
+
+### Programação de vários dias: um dia de cada vez
+
+Com **Até o dia**, cada dia tem o seu **Concluir o dia** (no cartão do dia
+na Agenda, e na ficha, que lista os dias). No calendário, cada dia mostra a
+situação dele: feito em verde, hoje em âmbar, programado em azul, e **o dia
+que passou sem ser feito fica vermelho** — a programação entra nas atrasadas
+("falta 30/10, 31/10") até ele ser feito. Concluir um dia depois da data dele
+pede o porquê, como sempre. Quando o último dia é feito, a programação se
+conclui sozinha. Um dia concluído por engano se **reabre** pela ficha.
+
+**Concluir todos os dias**, na caixa de concluir, ainda fecha o período inteiro
+de uma vez (o jeito de antes, para a viagem que só se conclui no fim).
 
 ### O que fica registrado
 

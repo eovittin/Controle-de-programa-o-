@@ -21,15 +21,76 @@ test("situação conforme o dia de referência", () => {
   assert.equal(D.situacao(it, "2026-10-21"), "atrasada", "em andamento depois do prazo continua atrasada");
 });
 
-test("item de vários dias: atrasa só depois do último", () => {
+test("item de vários dias: cada dia se conclui e atrasa sozinho", () => {
   D.apagarTudo();
   const it = novo({ data: "2026-10-20", dataFim: "2026-10-22" });
-  assert.equal(D.situacao(it, "2026-10-21"), "hoje");
-  assert.equal(D.situacao(it, "2026-10-22"), "hoje");
-  assert.equal(D.situacao(it, "2026-10-23"), "atrasada");
+  assert.ok(D.variosDias(it));
   assert.deepEqual(D.diasDo(it), ["2026-10-20", "2026-10-21", "2026-10-22"]);
   assert.ok(D.noPeriodo(it, "2026-10-22", "2026-10-30"));
   assert.ok(!D.noPeriodo(it, "2026-10-23", "2026-10-30"));
+
+  assert.equal(D.situacao(it, "2026-10-20"), "hoje");
+  assert.equal(D.situacao(it, "2026-10-21"), "atrasada", "o dia 20 passou sem fazer");
+  assert.equal(D.situacaoDia(it, "2026-10-20", "2026-10-21"), "atrasada");
+  assert.equal(D.situacaoDia(it, "2026-10-21", "2026-10-21"), "hoje");
+  assert.equal(D.situacaoDia(it, "2026-10-22", "2026-10-21"), "programada");
+
+  D.concluirDia(it.id, "2026-10-20", "2026-10-20");
+  assert.equal(D.situacao(it, "2026-10-21"), "hoje");
+  assert.equal(D.situacaoDia(it, "2026-10-20", "2026-10-21"), "concluida");
+  assert.equal(it.status, "programada", "faltam dias");
+
+  D.concluirDia(it.id, "2026-10-21", "2026-10-22", "Sem motorista", "folga");
+  assert.equal(D.situacaoDia(it, "2026-10-21", "2026-10-22"), "concluida-atraso");
+  assert.deepEqual(it.dias["2026-10-21"], { em: "2026-10-22", motivo: "Sem motorista", detalhe: "folga" });
+
+  D.concluirDia(it.id, "2026-10-22", "2026-10-22");
+  assert.equal(it.status, "concluida", "o último dia conclui o item");
+  assert.equal(it.concluidaEm, "2026-10-22");
+  assert.equal(D.situacao(it, "2026-10-25"), "concluida");
+  assert.deepEqual(it.historico.map(h => h.texto).slice(1), [
+    "Dia 20/10 concluído",
+    "Dia 21/10 concluído em 22/10, 1 dia depois — Sem motorista (folga)",
+    "Dia 22/10 concluído",
+    "Concluída: todos os dias feitos",
+  ]);
+
+  D.reabrirDia(it.id, "2026-10-22");
+  assert.equal(it.status, "programada");
+  assert.equal(it.concluidaEm, undefined);
+  assert.equal(D.situacao(it, "2026-10-25"), "atrasada");
+  assert.deepEqual(D.diasPendentes(it), ["2026-10-22"]);
+
+  D.reabrir(it.id);
+  assert.equal(it.dias, undefined, "reabrir tudo desfaz os dias");
+});
+
+test("item de vários dias: concluir tudo de uma vez continua valendo", () => {
+  D.apagarTudo();
+  const it = novo({ data: "2026-10-20", dataFim: "2026-10-22" });
+  D.concluir(it.id, "2026-10-22");
+  assert.equal(D.situacao(it, "2026-10-25"), "concluida");
+  assert.equal(D.situacaoDia(it, "2026-10-20", "2026-10-25"), "concluida");
+});
+
+test("o último dia feito com atraso leva o motivo para o item", () => {
+  D.apagarTudo();
+  const it = novo({ data: "2026-10-20", dataFim: "2026-10-21" });
+  D.concluirDia(it.id, "2026-10-20", "2026-10-20");
+  D.concluirDia(it.id, "2026-10-21", "2026-10-23", "Clima ou estrada");
+  assert.equal(D.situacao(it, "2026-10-25"), "concluida-atraso");
+  assert.equal(it.motivoAtraso, "Clima ou estrada");
+});
+
+test("remarcar tira os dias feitos que saíram do período", () => {
+  D.apagarTudo();
+  const it = novo({ data: "2026-10-20", dataFim: "2026-10-22" });
+  D.concluirDia(it.id, "2026-10-20", "2026-10-20");
+  D.concluirDia(it.id, "2026-10-21", "2026-10-21");
+  D.editar(it.id, D.conferir({ ...it, data: "2026-10-21", dataFim: "2026-10-23" }).limpo, "Outra prioridade");
+  assert.deepEqual(Object.keys(it.dias), ["2026-10-21"]);
+  D.editar(it.id, D.conferir({ ...it, data: "2026-10-21", dataFim: "" }).limpo, "Outra prioridade");
+  assert.equal(it.dias, undefined, "virou de um dia só");
 });
 
 test("concluir no prazo e com atraso", () => {
@@ -161,6 +222,16 @@ test("backup: baixar, juntar, substituir e ignorar o incompleto", () => {
 
   assert.equal(D.restaurarBackup(copia).atualizados, 1, "o mesmo id atualiza");
 
+  // os dias feitos vão no backup; o que não é data fica de fora
+  D.apagarTudo();
+  const v = novo({ data: "2026-10-20", dataFim: "2026-10-22" });
+  D.concluirDia(v.id, "2026-10-20", "2026-10-21", "Outra prioridade");
+  const comDias = JSON.parse(D.backup());
+  comDias.itens[0].dias["lixo"] = { em: "2026-10-21" };
+  D.apagarTudo();
+  D.restaurarBackup(JSON.stringify(comDias));
+  assert.deepEqual(D.porId(v.id).dias, { "2026-10-20": { em: "2026-10-21", motivo: "Outra prioridade" } });
+
   const lixo = JSON.stringify({ itens: [{ atividade: "", data: "x" }, { atividade: "ok", data: "2026-10-01", status: "inventado" }] });
   const r2 = D.restaurarBackup(lixo, true);
   assert.deepEqual(r2, { novos: 1, atualizados: 0, ignorados: 1, mobNovas: 0, mobAtualizadas: 0, mobIgnoradas: 0 });
@@ -179,5 +250,8 @@ test("planilha CSV para o Excel", () => {
   assert.ok(linha.startsWith("20/10/2026;;;;F-617;Viagem;"));
   assert.ok(linha.includes('"Levar ""urgente""; com nota"'));
   assert.ok(linha.includes(";Programada;"));
+  const varios = novo({ atividade: "Lavagem", data: "2026-10-20", dataFim: "2026-10-23" });
+  D.concluirDia(varios.id, "2026-10-20", "2026-10-20");
+  assert.ok(D.planilha([varios], "2026-10-19").split("\r\n")[1].includes(";1/4;"), "dias feitos");
   assert.ok(linha.endsWith('"linha 1\nlinha 2"'));
 });

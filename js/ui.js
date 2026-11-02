@@ -19,10 +19,8 @@ export function icone(nome) {
 }
 
 /** O selo da situação: o ponto na cor e o nome escrito. */
-export const seloSituacao = (it, ref) => {
-  const s = situacao(it, ref);
-  return el("span", { class: "selo s-" + s }, SITUACOES[s]);
-};
+export const seloDe = s => el("span", { class: "selo s-" + s }, SITUACOES[s]);
+export const seloSituacao = (it, ref) => seloDe(situacao(it, ref));
 
 /** Aviso no pé da tela, que some sozinho. Com `acao`, leva um botão
  *  (o "Desfazer"). */

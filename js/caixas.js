@@ -1,7 +1,7 @@
 // As caixas que abrem por cima da tela: a programação (nova e editar), a
 // ficha do item, concluir e cancelar. Uma <dialog> só, reaproveitada.
 
-import { el, hoje, ehData, difDias, brCurto, brData, porExtenso, inicioDaSemana, plural } from "./util.js";
+import { el, hoje, ehData, difDias, brCurto, brData, porExtenso, inicioDaSemana, plural, SEMANA, diaDaSemana } from "./util.js";
 import * as D from "./dados.js";
 import { ui, redesenhar } from "./estado.js";
 import { icone, avisar, seloSituacao, segmentos } from "./ui.js";
@@ -216,6 +216,7 @@ export function abrirFicha(id) {
       linha("Motivo do atraso", [it.motivoAtraso, it.detalheAtraso].filter(Boolean).join(" — ")),
       linha("Cancelada", it.motivoCancelamento),
       linha("Observações", it.obs ? el("span", { class: "quebra" }, it.obs) : "")),
+    D.variosDias(it) && s !== "cancelada" ? diasDaFicha(it) : null,
     it.historico?.length ? el("section", { class: "historico" }, el("h4", {}, "Histórico"),
       el("ol", {}, [...it.historico].reverse().map(h => el("li", {}, el("time", {}, quandoHist(h.quando)), el("span", {}, h.texto)))))
       : null);
@@ -238,6 +239,25 @@ export function abrirFicha(id) {
   abrir("Programação", corpo, acoes);
 }
 
+/** Na ficha de um item de vários dias: cada dia, a situação dele e o botão
+ *  que conclui ou reabre só aquele dia. */
+function diasDaFicha(it) {
+  const ref = hoje();
+  return el("section", { class: "dias-item" }, el("h4", {}, "Dias"),
+    el("ul", {}, D.diasDo(it).map(d => {
+      const sd = D.situacaoDia(it, d, ref);
+      const feito = it.dias?.[d];
+      return el("li", {},
+        el("span", { class: "dia-rot" }, porExtenso(d)),
+        el("span", { class: "selo s-" + sd, title: feito?.motivo ? [feito.motivo, feito.detalhe].filter(Boolean).join(" — ") : null },
+          D.SITUACOES[sd] + (feito && feito.em !== d ? ` em ${brCurto(feito.em)}` : "")),
+        feito
+          ? el("button", { type: "button", class: "mini", onclick: () => { D.reabrirDia(it.id, d); redesenhar(); abrirFicha(it.id); } }, "Reabrir")
+          : it.status === "concluida" ? null
+          : el("button", { type: "button", class: "mini forte", onclick: () => abrirConcluir(it.id, d) }, "Concluir"));
+    })));
+}
+
 function duplicar(it) {
   const { frota, categoria, atividade, onde, horaInicio, horaFim, responsavel, prioridade, obs } = it;
   abrirFormulario(null, { frota, categoria, atividade, onde, horaInicio, horaFim, responsavel, prioridade, obs, data: it.data });
@@ -253,9 +273,63 @@ export function excluirItem(id) {
 
 // ── concluir ─────────────────────────────────────────────────────────────────
 
-export function abrirConcluir(id) {
+/** Concluir: num item de vários dias, um dia de cada vez (`dia` é o que vem
+ *  escolhido); nos outros, o item inteiro. */
+export function abrirConcluir(id, dia = null) {
   const it = D.porId(id);
   if (!it) return;
+  if (D.variosDias(it) && D.diasPendentes(it).length) concluirDia(it, dia);
+  else concluirTudo(it);
+}
+
+const rotuloDia = d => `${SEMANA[diaDaSemana(d)]} ${brCurto(d)}`;
+
+function concluirDia(it, pedido) {
+  const h = hoje();
+  const todos = D.diasDo(it);
+  const pendentes = D.diasPendentes(it);
+  // o dia pedido; senão o primeiro que passou sem fazer; senão o primeiro que falta
+  let dia = pendentes.includes(pedido) ? pedido : pendentes.find(d => d <= h) || pendentes[0];
+  const quando = entrada("quando", h, { type: "date", max: h });
+  const motivo = blocoMotivo(D.MOTIVOS_ATRASO, "motivo", "Por que atrasou?");
+  const aviso = el("p", { class: "aviso-atraso" });
+  const ver = () => {
+    const atraso = ehData(quando.value) ? difDias(dia, quando.value) : 0;
+    aviso.hidden = motivo.bloco.hidden = atraso <= 0;
+    aviso.textContent = `O dia era ${brCurto(dia)}: concluído ${plural(atraso, "dia", "dias")} depois.`;
+    return atraso;
+  };
+  quando.addEventListener("change", ver);
+  const escolha = segmentos(pendentes.map(d => [d, rotuloDia(d)]), dia, v => { dia = v; ver(); }, { rotulo: "Qual dia", classe: "chips" });
+
+  const form = el("form", { class: "form", novalidate: true, onsubmit: e => { e.preventDefault(); salvar(); } },
+    el("p", { class: "ficha-tit" }, it.frota ? el("b", {}, it.frota + " · ") : null, it.atividade),
+    el("p", { class: "dica" }, `${todos.length - pendentes.length} de ${todos.length} dias feitos (${brCurto(it.data)} a ${brCurto(D.prazo(it))}).`),
+    campo("Qual dia?", escolha, { nome: "dia" }),
+    campo("Concluído em", quando, { nome: "quando" }),
+    aviso, motivo.bloco,
+    el("button", { type: "submit", hidden: true }));
+  ver();
+
+  function salvar() {
+    const erros = {};
+    if (!ehData(quando.value)) erros.quando = "Escolha o dia.";
+    else if (quando.value > h) erros.quando = "Não dá para concluir no futuro.";
+    else if (ver() > 0 && motivo.erro()) erros.motivo = motivo.erro();
+    if (!mostrarErros(form, erros)) return;
+    const atrasou = ver() > 0;
+    D.concluirDia(it.id, dia, quando.value, atrasou ? motivo.motivo() : "", atrasou ? motivo.detalhe() : "");
+    pronto(it.status === "concluida" ? "Último dia feito: programação concluída." : `Dia ${brCurto(dia)} concluído.`);
+  }
+
+  abrir("Concluir o dia", form, [
+    el("button", { type: "button", onclick: () => abrirFicha(it.id) }, "Voltar"),
+    el("button", { type: "button", onclick: () => concluirTudo(it) }, "Concluir todos os dias"),
+    el("button", { type: "button", class: "primario", onclick: salvar }, "Concluir o dia"),
+  ]);
+}
+
+function concluirTudo(it) {
   const h = hoje();
   const quando = entrada("quando", h, { type: "date", max: h });
   const motivo = blocoMotivo(D.MOTIVOS_ATRASO, "motivo", "Por que atrasou?");
@@ -286,9 +360,10 @@ export function abrirConcluir(id) {
     pronto(atrasou ? "Concluída com atraso." : "Concluída.");
   }
 
-  abrir("Concluir", form, [
+  const todos = D.variosDias(it);
+  abrir(todos ? "Concluir todos os dias" : "Concluir", form, [
     el("button", { type: "button", onclick: () => abrirFicha(it.id) }, "Voltar"),
-    el("button", { type: "button", class: "primario", onclick: salvar }, "Concluir"),
+    el("button", { type: "button", class: "primario", onclick: salvar }, todos ? "Concluir todos" : "Concluir"),
   ]);
 }
 
